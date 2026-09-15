@@ -1,0 +1,7 @@
+session_id,step_id,timestamp,action,screen,target,duration_seconds,outcome,error_message,navigation_type
+S002,1,2026-09-15 11:00:01,click,Products Page,Product Card,3,success,,forward
+S002,2,2026-09-15 11:00:05,click,Product Details,Back Button,2,success,,back
+S002,3,2026-09-15 11:00:08,click,Products Page,Product Card,3,success,,forward
+S002,4,2026-09-15 11:00:12,click,Product Details,Back Button,2,success,,back
+S002,5,2026-09-15 11:00:15,click,Products Page,Product Card,3,success,,forward
+S002,6,2026-09-15 11:00:19,click,Product Details,Add To Cart,3,success,,direct

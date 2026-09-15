@@ -1,16 +1,16 @@
-step_id,timestamp,screen,action,target,duration_seconds,outcome
-1,2026-09-12T10:00:00,Login,click,Email field,3,success
-2,2026-09-12T10:00:03,Login,type,email,4,success
-3,2026-09-12T10:00:07,Login,click,Password field,3,success
-4,2026-09-12T10:00:10,Login,type,password,4,success
-5,2026-09-12T10:00:14,Login,click,Login button,2,failed
-6,2026-09-12T10:00:16,Login,click,Login button,2,failed
-7,2026-09-12T10:00:18,Login,click,Login button,2,success
-8,2026-09-12T10:00:20,Dashboard,click,Products,4,success
-9,2026-09-12T10:00:24,Products,click,Search box,3,success
-10,2026-09-12T10:00:27,Products,type,wireless headphones,18,success
-11,2026-09-12T10:00:45,Products,click,Search icon,3,success
-12,2026-09-12T10:00:48,Product Detail,click,Back to Products,5,success
-13,2026-09-12T10:00:53,Products,click,Search box,3,success
-14,2026-09-12T10:00:56,Products,type,wireless headphones,4,success
-15,2026-09-12T10:01:00,Products,click,Search icon,3,success
+session_id,step_id,timestamp,action,screen,target,duration_seconds,outcome,error_message,navigation_type
+S001,1,2026-09-15 10:00:01,open,Login Page,Login Form,2,success,,direct
+S001,2,2026-09-15 10:00:05,type,Login Page,Email Field,3,success,,direct
+S001,3,2026-09-15 10:00:09,type,Login Page,Password Field,4,success,,direct
+S001,4,2026-09-15 10:00:14,click,Login Page,Login Button,2,failed,Invalid password,direct
+S001,5,2026-09-15 10:00:17,click,Login Page,Login Button,1,failed,Invalid password,direct
+S001,6,2026-09-15 10:00:20,click,Login Page,Login Button,1,success,,direct
+S001,7,2026-09-15 10:00:23,click,Home Page,Products Menu,2,success,,forward
+S001,8,2026-09-15 10:00:27,click,Products Page,Product Search,3,success,,forward
+S001,9,2026-09-15 10:00:31,type,Products Page,Product Search,4,success,,direct
+S001,10,2026-09-15 10:00:51,click,Products Page,Search Button,20,success,,direct
+S001,11,2026-09-15 10:00:55,click,Product Details,Product Card,3,success,,forward
+S001,12,2026-09-15 10:00:59,click,Products Page,Back Button,2,success,,back
+S001,13,2026-09-15 10:01:03,click,Products Page,Product Card,3,success,,direct
+S001,14,2026-09-15 10:01:08,click,Product Details,Product Card,4,success,,forward
+S001,15,2026-09-15 10:01:12,click,Product Details,Add To Cart,3,success,,direct
