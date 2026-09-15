@@ -8,17 +8,31 @@ from src.loader import load_session_log
 from src.detector import detect_friction
 from src.scoring import rank_friction
 from src.summarizer import summarize_with_ollama, fallback_summary
+from src.scoring import calculate_score
 
 st.set_page_config(page_title="User Flow Friction Analyzer", layout="wide")
 st.title("User Flow Friction Analyzer")
 st.caption("Synthetic usability-session analysis prototype")
 
 df = load_session_log(ROOT / "data" / "session_log.csv")
-points = rank_friction(detect_friction(df))
+points = detect_friction(df)
+scored_points = calculate_score(points)
 
 st.subheader("1. Friction points")
-st.dataframe([{"Step": p.step_id, "Friction": p.friction_type, "Severity": p.severity, "Likely impact": p.impact, "Reason": p.reason} for p in points], use_container_width=True)
-
+st.dataframe(
+    [
+        {
+            "Step": p.step_id,
+            "Friction": ", ".join(p.friction_types),
+            "Score": p.score,
+            "Severity": p.severity,
+            "Likely impact": p.impact,
+            "Reason": " ".join(p.reasons),
+        }
+        for p in scored_points
+    ],
+    use_container_width=True,
+)
 st.subheader("2. Severity / impact")
 c1, c2, c3 = st.columns(3)
 c1.metric("High", sum(p.severity == "High" for p in points))
