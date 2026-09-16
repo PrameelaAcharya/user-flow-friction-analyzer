@@ -5,58 +5,81 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3"
 
 
+def select_top_friction(points, limit=3):
+    """Select top friction points while preserving score ties."""
+
+    if not points or limit <= 0:
+        return []
+
+    sorted_points = sorted(
+        points,
+        key=lambda point: (-point.score, point.step_id),
+    )
+
+    if len(sorted_points) <= limit:
+        return sorted_points
+
+    cutoff_score = sorted_points[limit - 1].score
+
+    return [
+        point
+        for point in sorted_points
+        if point.score >= cutoff_score
+    ]
+
+
 def fallback_summary(points) -> str:
-    """Create a simple summary without using AI."""
+    """Create an evidence-based UX summary without AI."""
 
     if not points:
         return (
-            "The session completed without major friction signals."
+            "The session completed successfully without "
+            "detected friction signals."
         )
 
-    types = []
+    top_points = select_top_friction(points)
 
-    for point in points:
-        types.extend(point.friction_types)
+    observations = []
 
-    types = list(dict.fromkeys(types))
+    for point in top_points:
+        friction = ", ".join(
+            point.friction_types
+        ).lower()
 
-    high_count = sum(
-        point.severity == "High"
-        for point in points
-    )
+        reason = " ".join(point.reasons)
 
-    medium_count = sum(
-        point.severity == "Medium"
-        for point in points
-    )
+        observations.append(
+            f"step {point.step_id} shows {friction}: {reason}"
+        )
 
-    low_count = sum(
-        point.severity == "Low"
-        for point in points
-    )
-
-    friction_text = ", ".join(types)
+    observation_text = "; ".join(observations)
 
     return (
-        f"The flow shows {len(points)} friction points, "
-        f"including {friction_text}. "
-        f"There are {high_count} high-severity, "
-        f"{medium_count} medium-severity, and "
-        f"{low_count} low-severity issues. "
-        "The highest-severity points suggest areas where "
-        "users may experience difficulty or blocked progress."
+        "The session was mostly successful, but the analysis "
+        f"identified several areas of friction: "
+        f"{observation_text}. "
+        "These issues may cause users to experience "
+        "difficulty, hesitation, or interruption while "
+        "completing the task. "
+        "Overall, the flow appears functional but could "
+        "benefit from clearer error recovery and a smoother "
+        "interaction experience."
     )
 
 
 def summarize_with_ollama(points) -> str:
-    """Summarize scored friction points using local Ollama."""
+    """Summarize the highest-priority friction points using local Ollama."""
 
     if not points:
         return fallback_summary(points)
 
+    # Send the top 3 priority positions to the AI,
+    # including all records tied with the 3rd position.
+    top_points = select_top_friction(points)
+
     friction_data = []
 
-    for point in points:
+    for point in top_points:
         friction_data.append(
             {
                 "step": point.step_id,
@@ -69,22 +92,29 @@ def summarize_with_ollama(points) -> str:
         )
 
     prompt = f"""
-You are a UX analyst.
+You are a UX analyst reviewing a user-flow session.
 
-Summarize the following detected friction points from a
-user session.
+Write ONE concise paragraph describing the overall flow experience.
 
-Only use the information provided.
-Do not invent additional problems, metrics, or user behavior.
+Use ONLY the detected friction evidence provided below.
 
-Explain:
-1. The most important friction points.
-2. Their likely impact on the user experience.
-3. The overall flow experience.
+Your summary must:
+- Mention the most important friction points first.
+- Reference relevant step numbers.
+- Explain what the evidence suggests about the user experience.
+- Describe likely task impact such as interruption, hesitation, difficulty,
+  repeated actions, or blocked progress.
+- Mention successful progress through the flow when relevant.
+- Treat severity as a prioritization signal, not as proof of user emotion.
+- Do NOT assume the user's emotions, intentions, urgency, frustration,
+  disappointment, or motivation unless directly supported by the data.
+- Do NOT invent problems, metrics, or behaviors.
+- Do NOT repeat every score.
+- Do NOT simply list the friction points.
+- Keep the language professional and suitable for a UX diagnosis report.
+- Keep the response to 3-5 sentences.
 
-Keep the response to one concise paragraph.
-
-Detected friction points:
+Detected friction evidence:
 {friction_data}
 """
 
@@ -108,7 +138,15 @@ Detected friction points:
         if summary:
             return summary
 
-    except requests.RequestException:
-        pass
+        return (
+            "Ollama returned an empty response. "
+            "Showing the fallback summary instead.\n\n"
+            + fallback_summary(points)
+        )
 
-    return fallback_summary(points)
+    except requests.RequestException as error:
+        return (
+            f"Ollama summary unavailable: {error}. "
+            "Showing the fallback summary instead.\n\n"
+            + fallback_summary(points)
+        )

@@ -22,7 +22,9 @@ class ScoredFriction:
     reasons: list[str]
 
 
-def calculate_score(friction_points: list[FrictionPoint]) -> list[ScoredFriction]:
+def calculate_score(
+    friction_points: list[FrictionPoint],
+) -> list[ScoredFriction]:
     """
     Combine friction signals occurring at the same step
     and calculate an overall severity.
@@ -59,7 +61,6 @@ def calculate_score(friction_points: list[FrictionPoint]) -> list[ScoredFriction
             for point in points
         ]
 
-        # Use the strongest impact associated with the signals.
         if severity == "High":
             impact = "Strong evidence of user friction"
         elif severity == "Medium":
@@ -80,8 +81,5 @@ def calculate_score(friction_points: list[FrictionPoint]) -> list[ScoredFriction
 
     return sorted(
         scored_points,
-        key=lambda point: (
-            -point.score,
-            point.step_id,
-        ),
+        key=lambda point: (-point.score, point.step_id),
     )
