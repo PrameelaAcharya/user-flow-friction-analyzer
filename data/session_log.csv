@@ -10,7 +10,12 @@ S001,8,2026-09-15 10:00:27,click,Products Page,Product Search,3,success,,forward
 S001,9,2026-09-15 10:00:31,type,Products Page,Product Search,4,success,,direct
 S001,10,2026-09-15 10:00:51,click,Products Page,Search Button,20,success,,direct
 S001,11,2026-09-15 10:00:55,click,Product Details,Product Card,3,success,,forward
-S001,12,2026-09-15 10:00:59,click,Products Page,Back Button,2,success,,back
-S001,13,2026-09-15 10:01:03,click,Products Page,Product Card,3,success,,direct
-S001,14,2026-09-15 10:01:08,click,Product Details,Product Card,4,success,,forward
-S001,15,2026-09-15 10:01:12,click,Product Details,Add To Cart,3,success,,direct
+S001,12,2026-09-15 10:01:00,click,Products Page,Back Button,5,success,,back
+S001,13,2026-09-15 10:01:04,click,Product Details,Product Card,4,success,,forward
+S001,14,2026-09-15 10:01:09,click,Products Page,Back Button,5,success,,back
+S001,15,2026-09-15 10:01:14,click,Product Details,Product Card,5,success,,forward
+S001,16,2026-09-15 10:01:18,click,Product Details,Add To Cart,4,success,,direct
+S001,17,2026-09-15 10:01:22,click,Cart Page,Cart Icon,4,success,,forward
+S001,18,2026-09-15 10:01:26,click,Cart Page,Checkout Button,4,success,,direct
+S001,19,2026-09-15 10:01:31,click,Checkout Page,Payment Form,5,success,,forward
+S001,20,2026-09-15 10:01:37,click,Checkout Page,Place Order Button,6,success,,direct

@@ -1,20 +1,33 @@
+import os
 import sys
-from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-from src.loader import load_session_log
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from src.detector import detect_friction
 from src.scoring import calculate_score
-from src.summarizer import summarize_with_ollama, fallback_summary
+from src.summarizer import (
+    fallback_summary,
+    summarize_with_ollama,
+)
+from src.validator import validate_session_data
 
 
-# --------------------------------------------------
-# Page configuration
-# --------------------------------------------------
+SAMPLE_FILE = os.path.join(
+    PROJECT_ROOT,
+    "data",
+    "session_log.csv",
+)
+
+
+# ---------------------------------------------------------
+# PAGE CONFIGURATION
+# ---------------------------------------------------------
 
 st.set_page_config(
     page_title="User Flow Friction Analyzer",
@@ -23,342 +36,450 @@ st.set_page_config(
 )
 
 
-# --------------------------------------------------
-# Header
-# --------------------------------------------------
+# ---------------------------------------------------------
+# SESSION STATE
+# ---------------------------------------------------------
+
+if "analysis_complete" not in st.session_state:
+    st.session_state.analysis_complete = False
+
+if "session_data" not in st.session_state:
+    st.session_state.session_data = None
+
+if "scored_points" not in st.session_state:
+    st.session_state.scored_points = []
+
+
+# ---------------------------------------------------------
+# HEADER
+# ---------------------------------------------------------
 
 st.title("🔎 User Flow Friction Analyzer")
 
 st.caption(
-    "Analyze a bounded usability session and identify repeated actions, "
-    "failed attempts, pauses, and navigation friction."
+    "Analyze usability-session logs to identify friction, "
+    "prioritize severity, and summarize the overall experience."
 )
 
 
-# --------------------------------------------------
-# Load session data
-# --------------------------------------------------
+# ---------------------------------------------------------
+# SESSION INPUT
+# ---------------------------------------------------------
 
-df = load_session_log(
-    ROOT / "data" / "session_log.csv"
+st.subheader("1. Session Input")
+
+input_method = st.radio(
+    "Choose how you want to provide the session log:",
+    ["Use Sample Session", "Upload CSV"],
+    horizontal=True,
 )
 
 
-# --------------------------------------------------
-# Detect friction
-# --------------------------------------------------
-
-points = detect_friction(df)
+session_data = None
 
 
-# --------------------------------------------------
-# Calculate severity scores
-# --------------------------------------------------
+if input_method == "Use Sample Session":
 
-scored_points = calculate_score(points)
+    st.info("Using the built-in 20-step sample session.")
 
-
-# --------------------------------------------------
-# Prepare summary values
-# --------------------------------------------------
-
-total_steps = len(df)
-friction_count = len(scored_points)
-
-high_count = sum(
-    p.severity == "High"
-    for p in scored_points
-)
-
-medium_count = sum(
-    p.severity == "Medium"
-    for p in scored_points
-)
-
-low_count = sum(
-    p.severity == "Low"
-    for p in scored_points
-)
+    session_data = pd.read_csv(SAMPLE_FILE)
 
 
-# --------------------------------------------------
-# Session overview
-# --------------------------------------------------
+else:
 
-st.subheader("Session overview")
-
-c1, c2, c3, c4 = st.columns(4)
-
-c1.metric(
-    "Total steps",
-    total_steps,
-)
-
-c2.metric(
-    "Friction points",
-    friction_count,
-)
-
-c3.metric(
-    "High severity",
-    high_count,
-)
-
-c4.metric(
-    "Medium / Low",
-    medium_count + low_count,
-)
-
-
-st.caption(
-    "Pipeline: Session Log → Friction Detection → Severity Scoring → "
-    "Top Friction Analysis → UX Summary"
-)
-
-
-# ==================================================
-# VISUALIZATIONS
-# ==================================================
-
-if scored_points:
-
-    # --------------------------------------------------
-    # Visualization 1: Severity distribution
-    # --------------------------------------------------
-
-    st.subheader("Friction severity distribution")
-
-    severity_data = {
-        "Severity": [
-            "High",
-            "Medium",
-            "Low",
-        ],
-        "Count": [
-            high_count,
-            medium_count,
-            low_count,
-        ],
-    }
-
-    st.bar_chart(
-        severity_data,
-        x="Severity",
-        y="Count",
-        use_container_width=True,
+    uploaded_file = st.file_uploader(
+        "Upload a session log CSV",
+        type=["csv"],
+        help="Upload a CSV containing the required session-log columns.",
     )
 
-    st.caption(
-        "Number of detected friction points by calculated severity."
+    if uploaded_file is not None:
+
+        try:
+            session_data = pd.read_csv(uploaded_file)
+
+        except Exception as error:
+
+            st.error(
+                f"Unable to read the CSV file: {error}"
+            )
+
+
+# ---------------------------------------------------------
+# ANALYZE BUTTON
+# ---------------------------------------------------------
+
+analyze_clicked = st.button(
+    "🔍 Analyze Session",
+    type="primary",
+    use_container_width=True,
+)
+
+
+if analyze_clicked:
+
+    if session_data is None:
+
+        st.warning(
+            "Please upload a CSV or use the sample session."
+        )
+
+    else:
+
+        # -------------------------------------------------
+        # VALIDATION
+        # -------------------------------------------------
+
+        is_valid, validation_message = (
+            validate_session_data(session_data)
+        )
+
+        if not is_valid:
+
+            st.error(
+                f"Invalid session log: {validation_message}"
+            )
+
+        else:
+
+            # ---------------------------------------------
+            # FRICTION DETECTION
+            # ---------------------------------------------
+
+            friction_points = detect_friction(
+                session_data
+            )
+
+            # ---------------------------------------------
+            # SEVERITY SCORING
+            # ---------------------------------------------
+
+            scored_points = calculate_score(
+                friction_points
+            )
+
+            # ---------------------------------------------
+            # SAVE RESULTS
+            # ---------------------------------------------
+
+            st.session_state.session_data = (
+                session_data
+            )
+
+            st.session_state.scored_points = (
+                scored_points
+            )
+
+            st.session_state.analysis_complete = True
+
+            st.success(
+                "Session analyzed successfully."
+            )
+
+
+# =========================================================
+# RESULTS
+# =========================================================
+
+if st.session_state.analysis_complete:
+
+    session_data = st.session_state.session_data
+
+    scored_points = st.session_state.scored_points
+
+
+    # -----------------------------------------------------
+    # SESSION OVERVIEW
+    # -----------------------------------------------------
+
+    st.subheader("2. Session Overview")
+
+    total_steps = len(session_data)
+
+    friction_count = len(scored_points)
+
+    high_count = sum(
+        point.severity == "High"
+        for point in scored_points
+    )
+
+    medium_count = sum(
+        point.severity == "Medium"
+        for point in scored_points
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "Total Steps",
+        total_steps,
+    )
+
+    col2.metric(
+        "Friction Points",
+        friction_count,
+    )
+
+    col3.metric(
+        "High Severity",
+        high_count,
+    )
+
+    col4.metric(
+        "Medium Severity",
+        medium_count,
     )
 
 
-    # --------------------------------------------------
-    # Visualization 2: Friction score by step
-    # --------------------------------------------------
+    # -----------------------------------------------------
+    # SEVERITY OVERVIEW
+    # -----------------------------------------------------
 
-    st.subheader("Friction score by step")
+    st.subheader("3. Severity Overview")
 
-    score_data = {
-        "Step": [
-            f"Step {p.step_id}"
-            for p in scored_points
-        ],
-        "Score": [
-            p.score
-            for p in scored_points
-        ],
-    }
-
-    st.bar_chart(
-        score_data,
-        x="Step",
-        y="Score",
-        use_container_width=True,
+    severity_counts = pd.Series(
+        {
+            "High": sum(
+                point.severity == "High"
+                for point in scored_points
+            ),
+            "Medium": sum(
+                point.severity == "Medium"
+                for point in scored_points
+            ),
+            "Low": sum(
+                point.severity == "Low"
+                for point in scored_points
+            ),
+        }
     )
 
-    st.caption(
-        "Higher scores indicate a stronger combination of friction signals."
-    )
+    st.bar_chart(severity_counts)
 
 
-    # --------------------------------------------------
-    # Visualization 3: Session timeline
-    # --------------------------------------------------
+    # -----------------------------------------------------
+    # DETECTED FRICTION
+    # -----------------------------------------------------
 
-    st.subheader("Session timeline")
+    st.subheader("4. Detected Friction Points")
+
+    if not scored_points:
+
+        st.success(
+            "No friction points were detected."
+        )
+
+    else:
+
+        friction_rows = []
+
+        for point in scored_points:
+
+            friction_rows.append(
+                {
+                    "Step": point.step_id,
+                    "Friction Type": ", ".join(
+                        point.friction_types
+                    ),
+                    "Score": point.score,
+                    "Severity": point.severity,
+                    "Impact": point.impact,
+                    "Reason": " ".join(
+                        point.reasons
+                    ),
+                }
+            )
+
+        friction_df = pd.DataFrame(
+            friction_rows
+        )
+
+        st.dataframe(
+            friction_df,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+    # -----------------------------------------------------
+    # FRICTION SCORE BY STEP
+    # -----------------------------------------------------
+
+    if scored_points:
+
+        st.subheader("5. Friction Score by Step")
+
+        score_chart = pd.DataFrame(
+            {
+                "Step": [
+                    point.step_id
+                    for point in scored_points
+                ],
+                "Score": [
+                    point.score
+                    for point in scored_points
+                ],
+            }
+        )
+
+        st.bar_chart(
+            score_chart.set_index("Step")
+        )
+
+
+    # -----------------------------------------------------
+    # SESSION FLOW
+    # -----------------------------------------------------
+
+    st.subheader("6. Session Flow")
 
     friction_by_step = {
-        p.step_id: p
-        for p in scored_points
+        point.step_id: point
+        for point in scored_points
     }
 
+    total_steps = len(session_data)
+
     timeline_columns = st.columns(
-        min(total_steps, 8)
+        min(total_steps, 5)
     )
 
-    for index, row in df.iterrows():
+    for index, (_, row) in enumerate(
+        session_data.iterrows()
+    ):
+
+        column = timeline_columns[
+            index % len(timeline_columns)
+        ]
 
         step_id = int(row["step_id"])
 
-        if step_id in friction_by_step:
-            friction = friction_by_step[step_id]
+        with column:
 
-            if friction.severity == "High":
-                marker = "🔴"
-            elif friction.severity == "Medium":
-                marker = "🟠"
-            else:
-                marker = "🟡"
+            if step_id in friction_by_step:
 
-            label = (
-                f"{marker} **Step {step_id}**"
-            )
+                point = friction_by_step[step_id]
 
-            with timeline_columns[index % len(timeline_columns)]:
-                st.markdown(label)
-                st.caption(
-                    f"{', '.join(friction.friction_types)}"
+                if point.severity == "High":
+
+                    marker = "🔴"
+
+                elif point.severity == "Medium":
+
+                    marker = "🟠"
+
+                else:
+
+                    marker = "🟡"
+
+                st.markdown(
+                    f"**{marker} Step {step_id}**"
                 )
 
-        else:
-            with timeline_columns[index % len(timeline_columns)]:
+                st.caption(
+                    f"{point.severity} · "
+                    f"Score {point.score}"
+                )
+
+            else:
+
                 st.markdown(
                     f"🟢 **Step {step_id}**"
                 )
-                st.caption(
-                    str(row["action"])
-                )
 
-    st.caption(
-        "🟢 Normal step   🟡 Low friction   "
-        "🟠 Medium friction   🔴 High friction"
+                st.caption("Normal")
+
+
+    # -----------------------------------------------------
+    # FLOW EXPERIENCE SUMMARY
+    # -----------------------------------------------------
+
+    st.subheader(
+        "7. Flow Experience Summary"
     )
 
+    if scored_points:
 
-# ==================================================
-# REQUIRED OUTPUTS
-# ==================================================
+        summary_type = st.radio(
+            "Choose summary type:",
+            [
+                "Normal Summary",
+                "AI Summary",
+            ],
+            horizontal=True,
+            key="summary_type",
+        )
 
+        if summary_type == "Normal Summary":
 
-# --------------------------------------------------
-# 1. Friction points
-# --------------------------------------------------
+            summary = fallback_summary(
+                scored_points
+            )
 
-st.subheader("1. Friction points")
+            st.info(summary)
 
-if not scored_points:
+        else:
 
-    st.success(
-        "No friction signals were detected in this session."
-    )
+            st.caption(
+                "AI summary generated using local Ollama."
+            )
 
-else:
+            summary = summarize_with_ollama(
+                scored_points
+            )
 
-    st.dataframe(
-        [
-            {
-                "Step": p.step_id,
-                "Friction": ", ".join(p.friction_types),
-                "Score": p.score,
-                "Severity": p.severity,
-                "Likely impact": p.impact,
-                "Reason": " ".join(p.reasons),
-            }
-            for p in scored_points
-        ],
-        use_container_width=True,
-        hide_index=True,
-    )
+            st.info(summary)
 
+    else:
 
-# --------------------------------------------------
-# 2. Severity / impact
-# --------------------------------------------------
-
-st.subheader("2. Severity / impact")
-
-c1, c2, c3 = st.columns(3)
-
-c1.metric(
-    "High",
-    high_count,
-)
-
-c2.metric(
-    "Medium",
-    medium_count,
-)
-
-c3.metric(
-    "Low",
-    low_count,
-)
-
-if scored_points:
-
-    st.info(
-        "Severity is calculated from the combination of "
-        "detected friction signals at each step."
-    )
+        st.success(
+            "The session completed without "
+            "detected friction signals."
+        )
 
 
-# --------------------------------------------------
-# 3. Flow experience summary
-# --------------------------------------------------
+    # -----------------------------------------------------
+    # RAW SESSION LOG
+    # -----------------------------------------------------
 
-st.subheader("3. Flow experience summary")
+    st.subheader("8. Session Log")
 
-use_ai = st.toggle(
-    "Use local AI summary (Ollama)",
-    value=False,
-)
+    with st.expander(
+        "View raw session data"
+    ):
 
-if use_ai:
-
-    st.write(
-        summarize_with_ollama(scored_points)
-    )
-
-else:
-
-    st.write(
-        fallback_summary(scored_points)
-    )
+        st.dataframe(
+            session_data,
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
-# --------------------------------------------------
-# Input session log
-# --------------------------------------------------
+    # -----------------------------------------------------
+    # ASSUMPTIONS
+    # -----------------------------------------------------
 
-with st.expander("View input session log"):
+    with st.expander("Assumptions"):
 
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-    )
-
-
-# --------------------------------------------------
-# Assumptions
-# --------------------------------------------------
-
-with st.expander("View analysis assumptions"):
-
-    st.write(
-        "• Long pause = 15+ seconds\n\n"
-        "• Failed outcome = friction\n\n"
-        "• Immediate repeated action = repetition\n\n"
-        "• Repeated navigation cycle = possible backtracking\n\n"
-        "• AI is only used for summarization"
-    )
+        st.markdown(
+            """
+            - A long pause is defined as 15 seconds or more.
+            - Failed outcomes are treated as friction signals.
+            - Immediate repeated actions may indicate difficulty.
+            - Repeated navigation between screens may indicate backtracking.
+            - Severity is calculated from friction-type scores.
+            - The AI is used only to summarize detected friction.
+            """
+        )
 
 
-# --------------------------------------------------
-# Footer
-# --------------------------------------------------
+# ---------------------------------------------------------
+# FOOTER
+# ---------------------------------------------------------
+
+st.divider()
 
 st.caption(
-    "Prototype built for usability-session friction analysis."
+    "User Flow Friction Analyzer · "
+    "Rule-based friction detection + local AI summary"
 )
